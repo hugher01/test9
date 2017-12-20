@@ -77,20 +77,25 @@ def inference(images):
         fc1 = tf.nn.relu(bias, name=scope)
         parameters += [kernel, biases]
         print_activtions(fc1)
+        keep_prob = tf.placeholder(tf.float32)
+        fc1_drop = tf.nn.dropout(fc1, keep_prob)
 
     with tf.name_scope('fc2') as scope:
         kernel = tf.Variable(tf.truncated_normal([4096,4096], dtype=tf.float32, stddev=1e-1), name='weights')
         biases = tf.Variable(tf.constant(0.0, shape=[4096], dtype=tf.float32), trainable=True, name='biases')
-        fc = tf.matmul(fc1, kernel)
+        fc = tf.matmul(fc1_drop, kernel)
         bias = tf.nn.bias_add(fc, biases)
         fc2 = tf.nn.relu(bias, name=scope)
         parameters += [kernel, biases]
         print_activtions(fc2)
 
+        keep_prob = tf.placeholder(tf.float32)
+        fc2_drop = tf.nn.dropout(fc2, keep_prob)
+
     with tf.name_scope('fc3') as scope:
         kernel = tf.Variable(tf.truncated_normal([4096,1000], dtype=tf.float32, stddev=1e-1), name='weights')
         biases = tf.Variable(tf.constant(0.0, shape=[1000], dtype=tf.float32), trainable=True, name='biases')
-        fc = tf.matmul(fc1, kernel)
+        fc = tf.matmul(fc2_drop, kernel)
         bias = tf.nn.bias_add(fc, biases)
         fc3 = tf.nn.softmax(bias, name=scope)
         parameters += [kernel, biases]
@@ -105,13 +110,10 @@ def loss(logits,labels):
     tf.add_to_collection('losses',cross_entropy_mean)
     return tf.add_n(tf.get_collection('losses'),name='total_loss')
 
-loss=loss(logits,label_holder)
-train_op=tf.train.AdamOptimizer(1e-3).minimize(loss)
-top_k_op=tf.nn.in_top_k(logits,label_holder,1)
+def train(loss,logits,label_holder):
+    train_op = tf.train.AdamOptimizer(1e-3).minimize(loss)
+    top_k_op = tf.nn.in_top_k(logits, label_holder, 1)
 
-sess=tf.InteractiveSession()
-tf.global_variables_initializer().run()
-tf.train.start_queue_runners()
 
 for step in range(max_steps):
     start_time=time.time()
@@ -169,10 +171,18 @@ def run_benchmark():
                                                image_size, 3],
                                               dtype=tf.float32,
                                               stddev=1e-1))
-        pool5, parameters = inference(images)
-        init = tf.global_variables_initializer()
-        sess = tf.Session()
-        sess.run(init)
+
+        labels = tf.Variable(tf.random_normal([batch_size,
+                                               1,
+                                               1, 1],
+                                              dtype=tf.float32,
+                                              stddev=1e-1))
+
+        fc3, parameters = inference(images)
+
+        sess = tf.InteractiveSession()
+        tf.global_variables_initializer().run()
+        tf.train.start_queue_runners()
 
         time_tensorflow_run(sess, pool5, "Forward")
 
