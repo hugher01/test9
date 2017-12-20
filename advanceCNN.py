@@ -101,4 +101,3 @@ while step<num_iter:
 precision=true_count/total_sample_count
 print('precision @ 1=%.3f'%precision)
 # 0.695
-
