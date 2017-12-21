@@ -43,6 +43,8 @@ def mpool_op(input_op, name, kh, kw, dh, dw):
                           name=name)
 
 
+
+
 def inference_op(input_op, keep_prob):
     p = []
 
