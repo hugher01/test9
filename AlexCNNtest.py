@@ -1,3 +1,4 @@
+# 有问题
 from datetime import datetime
 import math
 import time
@@ -9,6 +10,7 @@ batch_size = 128
 image_size = 224
 data_dir = 'D:\\tmp\\cifar10_data\\cifar-10-batches-bin'
 
+
 # 取得训练及测试数据
 # import cifar10, cifar10_input
 # images_train, labels_train = cifar10_input.distorted_inputs(data_dir=data_dir, batch_size=batch_size)
@@ -16,6 +18,7 @@ data_dir = 'D:\\tmp\\cifar10_data\\cifar-10-batches-bin'
 
 def print_activtions(t):
     print(t.op.name, '', t.get_shape().as_list())
+
 
 def loss_cal(fc3, labels):
     labels = tf.cast(labels, tf.float32)
@@ -25,6 +28,7 @@ def loss_cal(fc3, labels):
     cross_entropy_mean = tf.reduce_mean(cross_entropy, name='cross_entropy')
     tf.add_to_collection('losses', cross_entropy_mean)
     return tf.add_n(tf.get_collection('losses'), name='total_loss')
+
 
 def inference(images, labels):
     parameters = []
@@ -127,6 +131,7 @@ def inference(images, labels):
 
     return loss, train_op, accuracy, parameters
 
+
 def run_benchmark():
     import numpy as np
     with tf.Graph().as_default():
@@ -150,9 +155,9 @@ def run_benchmark():
                                                   stddev=1e-1))
 
             labels = tf.Variable(tf.ceil(tf.random_normal([batch_size,
-                                                   1,
-                                                   1, 1],
-                                                  dtype=tf.float32)))
+                                                           1,
+                                                           1, 1],
+                                                          dtype=tf.float32)))
 
             # images, labels = sess.run([images_train, labels_train])
             start_time = time.time()
@@ -186,18 +191,19 @@ def run_benchmark():
                                                    stddev=1e-1))
 
         label_batch = tf.Variable(tf.ceil(tf.random_normal([batch_size,
-                                                    1,
-                                                    1, 1],
-                                                   dtype=tf.int32)))
+                                                            1,
+                                                            1, 1],
+                                                           dtype=tf.int32)))
         # image_batch,label_batch=sess.run([images_test,labels_test])
         loss, train_op, accuracy, parameters = inference(images, labels)
-        loss, train_op, accuracy, parameters= sess.run([loss, train_op, accuracy, parameters],
-                                                              feed_dict={images: image_batch, labels: label_batch})
+        loss, train_op, accuracy, parameters = sess.run([loss, train_op, accuracy, parameters],
+                                                        feed_dict={images: image_batch, labels: label_batch})
         true_count += np.sum(accuracy)
         step += 1
 
     precision = true_count / total_sample_count
     print('precision @ 1=%.3f' % precision)
+
 
 if __name__ == '__main__':
     run_benchmark()
