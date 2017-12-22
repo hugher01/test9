@@ -3,6 +3,9 @@ import math
 import time
 import tensorflow as tf
 
+batch_size = 3
+num_batches = 100
+
 
 def conv_op(input_op, name, kh, kw, n_out, dh, dw, p):
     n_in = input_op.get_shape()[-1].value
@@ -41,8 +44,6 @@ def mpool_op(input_op, name, kh, kw, dh, dw):
                           strides=[1, dh, dw, 1],
                           padding='SAME',
                           name=name)
-
-
 
 
 def inference_op(input_op, keep_prob):
@@ -86,3 +87,46 @@ def inference_op(input_op, keep_prob):
     predictions = tf.argmax(softmax, 1)
     return predictions, softmax, fc8, p
 
+
+def time_tensorflow_run(session, target, feed, info_string):
+    num_steps_burn_in = 10
+    total_duration = 0.0
+    total_duration_squared = 0.0
+
+    for i in range(num_batches + num_steps_burn_in):
+        start_time = time.time()
+        _ = session.run(target, feed_dict=feed)
+        duration = time.time() - start_time
+        if i >= num_steps_burn_in:
+            if not i % 10:
+                print('%s:step %d,duration = %.3f' % (datetime.now(), i - num_steps_burn_in, duration))
+            total_duration += duration
+            total_duration_squared += duration * duration
+    mn = total_duration / num_batches
+    vr = total_duration_squared / num_batches - mn * mn
+    sd = math.sqrt(vr)
+    print('%s:%s across %d steps, %.3f +/- %.3f sec/batch' % (datetime.now(), info_string, num_batches, mn, sd))
+
+
+def run_benchmark():
+    with tf.Graph().as_default():
+        image_size = 224
+        images = tf.Variable(tf.random_normal([batch_size,
+                                               image_size,
+                                               image_size, 3],
+                                              dtype=tf.float32,
+                                              stddev=1e-1))
+        keep_prob = tf.placeholder(tf.float32)
+        predictions, softmax, fc8, p = inference_op(images, keep_prob)
+
+        init = tf.global_variables_initializer()
+        sess = tf.Session()
+        sess.run(init)
+
+        time_tensorflow_run(sess, predictions, {keep_prob: 1.0}, "Forward")
+        objective = tf.nn.l2_loss(fc8)
+        grad = tf.gradients(objective, p)
+        time_tensorflow_run(sess, grad, {keep_prob: 0.5}, "Forward-backward")
+
+
+run_benchmark()
