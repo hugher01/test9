@@ -217,6 +217,31 @@ def resnet_v2_152(inputs, num_classes=None, global_pool=True, reuse=None,
                      include_root_block=True, reuse=reuse, scope=scope)
 
 
+import time
+from datetime import datetime
+import math
+
+
+def time_tensorflow_run(session, target, info_string):
+    num_steps_burn_in = 10
+    total_duration = 0.0
+    total_duration_squared = 0.0
+
+    for i in range(num_batches + num_steps_burn_in):
+        start_time = time.time()
+        _ = session.run(target)
+        duration = time.time() - start_time
+        if i >= num_steps_burn_in:
+            if not i % 10:
+                print('%s:step %d,duration = %.3f' % (datetime.now(), i - num_steps_burn_in, duration))
+            total_duration += duration
+            total_duration_squared += duration * duration
+    mn = total_duration / num_batches
+    vr = total_duration_squared / num_batches - mn * mn
+    sd = math.sqrt(vr)
+    print('%s:%s across %d steps, %.3f +/- %.3f sec/batch' % (datetime.now(), info_string, num_batches, mn, sd))
+
+
 # unit提升的主要场所是block2
 def resnet_v2_200(inputs, num_classes=None, global_pool=True, reuse=None,
                   scope='resnet_v2_200'):
@@ -229,3 +254,16 @@ def resnet_v2_200(inputs, num_classes=None, global_pool=True, reuse=None,
         Block('block4', bottleneck, [(2048, 512, 1)] * 3)]
     return resnet_v2(inputs, blocks, num_classes, global_pool,
                      include_root_block=True, reuse=reuse, scope=scope)
+
+
+batch_size = 3
+height, width = 224, 224
+inputs = tf.random_uniform((batch_size, height, width, 3))
+with slim.arg_scope(resnet_arg_scope(is_training=False)):
+    net, end_points = resnet_v2_152(inputs, 1000)
+
+init = tf.global_variables_initializer()
+sess = tf.Session()
+sess.run(init)
+num_batches = 100
+time_tensorflow_run(sess, net, "Forwad")
