@@ -23,6 +23,7 @@ def distort_color(image, color_ordering=0):
 
 
 def preprocess_for_train(image, height, width, bbox):
+    # bbox标注框
     if bbox is None:
         bbox = tf.constant([0.0, 0.0, 1.0, 1.0], dtype=tf.float32, shape=[1, 1, 4])
 
@@ -53,39 +54,57 @@ def calc_loss(logit, label_batch):
     return loss
 
 
-files = tf.train.match_filenames_once("/path/to/file_pattern-*")  # 搜索相似名称文件路径
-filename_queue = tf.train.string_input_producer(files, shuffle=False)  # 文件列表输入队列
+def getdata_batch(image_size, batch_size, files):
+    filename_queue = tf.train.string_input_producer(files, shuffle=False)  # 文件列表输入队列
 
-reader = tf.TFRecordReader()
-_, serialized_example = reader.read(filename_queue)
-features = tf.parse_single_example(
-    serialized_example,
-    features={
-        'image': tf.FixedLenSequenceFeature([], tf.string),
-        'label': tf.FixedLenSequenceFeature([], tf.int64),
-        'height': tf.FixedLenSequenceFeature([], tf.int64),
-        'width': tf.FixedLenSequenceFeature([], tf.int64),
-        'channels': tf.FixedLenSequenceFeature([], tf.int64), })
-image, label = features['image'], features['label']
-height, width = features['height'], features['width']
-channels = features['channels']
+    reader = tf.TFRecordReader()
+    _, serialized_example = reader.read(filename_queue)
+    features = tf.parse_single_example(
+        serialized_example,
+        features={
+            'image': tf.FixedLenSequenceFeature([], tf.string),
+            'label': tf.FixedLenSequenceFeature([], tf.int64),
+            'height': tf.FixedLenSequenceFeature([], tf.int64),
+            'width': tf.FixedLenSequenceFeature([], tf.int64),
+            'channels': tf.FixedLenSequenceFeature([], tf.int64), })
+    image, label = features['image'], features['label']
+    height, width = features['height'], features['width']
+    channels = features['channels']
 
-decoded_image = tf.decode_raw(image, tf.uint8)
-decoded_image.set_shape([height, width, channels])
-image_size = 299
-distored_image = preprocess_for_train(decoded_image, image_size, image_size, None)
+    decoded_image = tf.decode_raw(image, tf.uint8)
+    decoded_image.set_shape([height, width, channels])
 
-min_after_dequeue = 10000
-batch_size = 100
-capacity = min_after_dequeue + 3 * batch_size
-image_batch, label_batch = tf.train.shuffle_batch([distored_image, label], batch_size=batch_size, capacity=capacity,
-                                                  min_after_dequeue=min_after_dequeue)
+    distored_image = preprocess_for_train(decoded_image, image_size, image_size, None)
 
-learning_rate = 0.01
+    min_after_dequeue = 1000
 
-logit = inference(image_batch)
-loss = calc_loss(logit, label_batch)
-train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
+    capacity = min_after_dequeue + 3 * batch_size
+    image_batch, label_batch = tf.train.shuffle_batch([distored_image, label], batch_size=batch_size, capacity=capacity,
+                                                      min_after_dequeue=min_after_dequeue)
+    return image_batch, label_batch
 
 
+if __name__ == '__main__':
+    learning_rate = 0.01
+    epochs = 200
+    image_size = 299
+    batch_size = 100
 
+    files = tf.train.match_filenames_once("/path/to/file_pattern-*")  # 搜索相似名称文件路径
+
+    image_batch, label_batch = getdata_batch(image_size, batch_size, files)
+
+    logit = inference(image_batch)
+    loss = calc_loss(logit, label_batch)
+    train_step = tf.train.GradientDescentOptimizer(learning_rate).minimize(loss)
+
+    with tf.Session() as sess:
+        tf.initialize_all_variables().run()
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
+        for i in range(epochs):
+            sess.run(train_step)
+
+        coord.request_stop()
+        coord.join(threads)

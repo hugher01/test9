@@ -14,7 +14,7 @@ class Block(collections.namedtuple('Block', ['scope', 'unit_fn', 'args'])):
     unit_fn：ResNet V2中的残差学习单元  
     args：   它决定该block有几层,格式是[(depth, depth_bottleneck, stride)] 
   
-    示例：Block('block1', bottleneck, [(256,64,1),(256,64,1),(256,64,2)]) 
+    示例：Block('block1', bottleneck, [(256,64,31),(256,64,1),(256,64,2)])
     '''
 
 
@@ -256,7 +256,7 @@ def resnet_v2_200(inputs, num_classes=None, global_pool=True, reuse=None,
                      include_root_block=True, reuse=reuse, scope=scope)
 
 
-batch_size = 3
+batch_size = 32
 height, width = 224, 224
 inputs = tf.random_uniform((batch_size, height, width, 3))
 with slim.arg_scope(resnet_arg_scope(is_training=False)):
