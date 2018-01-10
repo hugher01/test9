@@ -1,3 +1,5 @@
+#数据转换为TFRedord格式。
+
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 import numpy as np
