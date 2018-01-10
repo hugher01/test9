@@ -35,38 +35,62 @@ import tensorflow as tf
 import numpy as np
 
 import matplotlib as mpl
+
 mpl.use('Agg')
 from matplotlib import pyplot as plt
-learn =tf.contrib.learn
 
-hidden_size=30
-num_layers=2
-timesteps=10
-training_steps=10000
-batch_size=32
+learn = tf.contrib.learn
 
-training_examples=10000
-testing_examples=1000
-sample_gap=0.01
+hidden_size = 30
+num_layers = 2
+timesteps = 10
+training_steps = 10000
+batch_size = 32
+
+training_examples = 10000
+testing_examples = 1000
+sample_gap = 0.01
+
 
 def generate_data(seq):
-    x=[]
-    y=[]
+    x = []
+    y = []
 
-    for i in range(len(seq)-timesteps-1):
-        x.append([seq[i:i+timesteps]])
+    for i in range(len(seq) - timesteps - 1):
+        x.append([seq[i:i + timesteps]])
         y.append([seq[i + timesteps]])
 
-    return np.array(x,dtype=np.float32),np.array(y,dtype=np.float32)
-
-def lstm_model(x,y):
-    lstm_cell=tf.nn.rnn_cell.BasicLSTMCell(hidden_size)
-    cell=tf.nn.rnn_cell.MultiRNNCell([lstm_cell]*num_layers)
-    x_=tf.unpack(x,axis=1)
-    output,_=tf.nn.rnn(cell,x_,dtype=tf.float32)
-    output=output[-1]
+    return np.array(x, dtype=np.float32), np.array(y, dtype=np.float32)
 
 
+def lstm_model(x, y):
+    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(hidden_size)
+    cell = tf.nn.rnn_cell.MultiRNNCell([lstm_cell] * num_layers)
+    x_ = tf.unpack(x, axis=1)
+    # x_ = tf.unstack(x, axis=1)
+    output, _ = tf.nn.rnn(cell, x_, dtype=tf.float32)
+    output = output[-1]
+    prediction, loss = learn.models.linear_regression(output, y)
+    train_op = tf.contrib.layers.optimize_loss(loss, tf.contrib.framework.get_global_step(),
+                                               optimizer="Adagrad", learning_rate=0.1)
+    return prediction, loss, train_op
 
 
+regressor = learn.Estimator(model_fn=lstm_model)
 
+test_start = training_examples * sample_gap
+test_end = (training_examples + testing_examples) * sample_gap
+train_x, train_y = generate_data(np.sin(np.linspace(0, test_start, training_examples, dtype=np.float32)))
+test_x, test_y = generate_data(np.sin(np.linspace(test_start, test_end, testing_examples, dtype=np.float32)))
+regressor.fit(train_x, train_y, batch_size=batch_size, steps=training_steps)
+
+predicted = [[pred] for pred in regressor.predict(test_x)]
+rmse = np.sqrt(((predicted - test_y) ** 2).mean(axis=0))
+print("RMSE: %f" % rmse)
+
+fig = plt.figure()
+plot_predicted = plt.plot(predicted, label='predicted')
+plot_test = plt.plot(test_y, label='real_sin')
+plt.legend([predicted, test_y], ['predicted', 'real_sin'])
+
+# fig.savefig('sin.png')
